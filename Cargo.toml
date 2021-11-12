@@ -1,0 +1,20 @@
+[package]
+name = "pdu-ctrl"
+edition = "2018"
+version = "0.1.0"
+description = "Liebert MPX PDU Control Daemon"
+authors = ["Sebastian Reichel <sre@mainframe.io>"]
+license = "ISC"
+repository = "https://github.com/sre/pdu-ctrl"
+
+[dependencies]
+liebert-mpx = { git = "https://github.com/sre/rust-liebert-mpx" , branch = "main" }
+rumqttc = "0.19.0"
+rustls-native-certs = "0.6"
+futures = "0.3"
+tokio = { version = "1.23", features = ["rt-multi-thread"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+regex = "1.7"
+rust-ini = "0.18"
+sd-notify = "0.4"

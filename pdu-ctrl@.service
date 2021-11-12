@@ -1,0 +1,40 @@
+[Unit]
+Description=PDU Control Daemon
+After=network-online.target
+
+# do not restart if there are more than 15 fails in 30min
+# this makes the process visible in systemctl --failed
+StartLimitIntervalSec=1800
+StartLimitBurst=15
+
+[Install]
+WantedBy=multi-user.target
+
+[Service]
+Type=notify
+ExecStart=pdu-ctrl /etc/pdu-ctrl/%I.conf
+StandardOutput=journal
+StandardError=journal
+MemoryLimit=256M
+TasksMax=1
+Restart=always
+RestartSec=60
+TimeoutSec=300
+WatchdogSec=60
+ProtectSystem=strict
+ProtectHome=yes
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+SystemCallFilter=@basic-io @file-system @io-event @network-io
+SystemCallErrorNumber=EPERM
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+MemoryDenyWriteExecute=true
+RestrictSUIDSGID=true
+KeyringMode=private
+ProtectClock=true
+RestrictRealtime=true
+ProtectHostname=true
