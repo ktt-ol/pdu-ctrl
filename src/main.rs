@@ -202,12 +202,26 @@ async fn read_events(task: &mut Task) -> Result<MQTTMsgList, liebert::MPXError> 
 
     /* 2. handle events */
     for event in &events {
-        if event.level == liebert::EventLevel::ALARM && event.event == liebert::EventType::ReceptacleOverCurrent {
-            /* disable receptacle */
-            eprintln!("over-current event: Disabling receptacle {}.{}.{}!", event.pdu, event.branch, event.receptacle);
-            retry_cmd(&task.mpx, event.pdu, event.branch, event.receptacle, liebert::ReceptacleCmd::Disable).await;
-        } else {
-            println!("unhandled event: {:?}", event);
+        match event.event {
+            liebert::EventType::ReceptacleOverCurrent => {
+                match event.level {
+                    liebert::EventLevel::ALARM => {
+                        /* disable receptacle */
+                        eprintln!("over-current alarm for receptacle {}.{}.{} - disabling", event.pdu, event.branch, event.receptacle);
+                        retry_cmd(&task.mpx, event.pdu, event.branch, event.receptacle, liebert::ReceptacleCmd::Disable).await;
+                    },
+                    liebert::EventLevel::WARNING => {
+                        eprintln!("over-current warning for receptacle {}.{}.{} - ignoring", event.pdu, event.branch, event.receptacle);
+                    },
+                    _ => {
+                        /* PDU does not seem to generate OK or INFO over-current events */
+                        println!("unhandled event: {:?}", event);
+                    },
+                }
+            },
+            _ => {
+                println!("unhandled event: {:?}", event);
+            },
         }
     }
 
