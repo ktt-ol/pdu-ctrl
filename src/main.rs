@@ -74,6 +74,7 @@ struct Task {
     branch: u8,
     receptacle: u8,
     cache: Cache,
+    receptacle_state: Option<bool>,
 }
 
 impl Task {
@@ -140,12 +141,14 @@ impl TaskListFunctions for TaskList {
             branch: 0,
             receptacle: 0,
             cache: Cache::None(()),
+            receptacle_state: None,
         });
     }
 }
 
 async fn read_receptacle(task: &mut Task) -> Result<MQTTMsgList, liebert::MPXError> {
     let info = task.mpx.get_info_receptacle(task.pdu, task.branch, task.receptacle).await?;
+    task.receptacle_state = Some(info.settings.power_state);
     let path = format!("/pdu-{}/branch-{}/receptacle-{}", task.pdu, task.branch, task.receptacle);
     let new = info.to_mqtt(&path);
     let result = task.cache.get_modified(&new);
@@ -244,6 +247,7 @@ async fn setup_tasklist(mpx: std::sync::Arc<liebert::MPX>, receptacles: &liebert
         branch: 0,
         receptacle: 0,
         cache: Cache::None(()),
+        receptacle_state: None,
     });
 
     for r in receptacles {
@@ -258,6 +262,7 @@ async fn setup_tasklist(mpx: std::sync::Arc<liebert::MPX>, receptacles: &liebert
                 branch: 0,
                 receptacle: 0,
                 cache: Cache::None(()),
+                receptacle_state: None,
             });
         }
 
@@ -272,6 +277,7 @@ async fn setup_tasklist(mpx: std::sync::Arc<liebert::MPX>, receptacles: &liebert
                 branch: r.branch,
                 receptacle: 0,
                 cache: Cache::None(()),
+                receptacle_state: None,
             });
         }
 
@@ -285,6 +291,7 @@ async fn setup_tasklist(mpx: std::sync::Arc<liebert::MPX>, receptacles: &liebert
             branch: r.branch,
             receptacle: r.receptacle,
             cache: Cache::None(()),
+            receptacle_state: None,
         });
     }
 
@@ -298,6 +305,7 @@ async fn setup_tasklist(mpx: std::sync::Arc<liebert::MPX>, receptacles: &liebert
 enum Command {
     Enable,
     Disable,
+    Toggle,
     Identify,
     SetLabel,
 }
@@ -320,6 +328,7 @@ fn parse_incoming_msg(msg: rumqttc::v4::Publish) -> Query {
     let mut cmd = match &msg.payload[..] {
         b"enable" => Some(Command::Enable),
         b"disable" => Some(Command::Disable),
+        b"toggle" => Some(Command::Toggle),
         b"identify" => Some(Command::Identify),
         _ => None,
     };
@@ -426,6 +435,19 @@ async fn update_label(mpx: &liebert::MPX, pdu: u8, branch: u8, receptacle: u8, l
     if ! test.is_ok() {
         eprintln!("Failed to update label for receptacle {}.{}.{}", pdu, branch, receptacle);
     }
+}
+
+fn port_is_enabled(tasklist: &mut TaskList, pdu: u8, branch: u8, receptacle: u8) -> bool {
+    for task in tasklist {
+        if task.pdu == pdu && task.branch == branch && task.receptacle == receptacle {
+            match task.receptacle_state {
+                Some(state) => { return state; },
+                None => {},
+            }
+        }
+    }
+
+    false
 }
 
 fn is_ready(tasklist: &mut TaskList) -> bool {
@@ -536,6 +558,15 @@ async fn main() {
                     Some(Command::Disable) => {
                         println!("Disable Receptacle {}.{}.{}", query.pdu, query.branch, query.receptacle);
                         retry_cmd(&refmpx, query.pdu, query.branch, query.receptacle, liebert::ReceptacleCmd::Disable).await;
+                        tasklist.reschedule_in(query.pdu, query.branch, query.receptacle, 5);
+                    },
+                    Some(Command::Toggle) => {
+                        println!("Toggle Receptacle {}.{}.{}", query.pdu, query.branch, query.receptacle);
+                        if port_is_enabled(&mut tasklist, query.pdu, query.branch, query.receptacle) {
+                            retry_cmd(&refmpx, query.pdu, query.branch, query.receptacle, liebert::ReceptacleCmd::Disable).await;
+                        } else {
+                            retry_cmd(&refmpx, query.pdu, query.branch, query.receptacle, liebert::ReceptacleCmd::Enable).await;
+                        }
                         tasklist.reschedule_in(query.pdu, query.branch, query.receptacle, 5);
                     },
                     Some(Command::Identify) => {
