@@ -9,12 +9,12 @@ repository = "https://github.com/sre/pdu-ctrl"
 
 [dependencies]
 liebert-mpx = { git = "https://github.com/sre/rust-liebert-mpx" , branch = "main" }
-rumqttc = "0.23"
+rumqttc = "0.24"
 rustls-native-certs = "0.7"
 futures = "0.3"
-tokio = { version = "1.35", features = ["rt-multi-thread"] }
+tokio = { version = "1.38", features = ["rt-multi-thread"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 regex = "1.10"
-rust-ini = "0.20"
+rust-ini = "0.21"
 sd-notify = "0.4"
